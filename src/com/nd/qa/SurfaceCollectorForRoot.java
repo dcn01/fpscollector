@@ -24,8 +24,7 @@ public class SurfaceCollectorForRoot {
 	
 	
 	public static void main(String[] args) {
-		args = new String[1];
-		args[0]="-root";
+
 		String helpInfo = "FPS collect tool version 1.0 \n"
 				+ "-d	-fps default collector \n"
 				+ "-root	-another fps collector,pad need root \n"
