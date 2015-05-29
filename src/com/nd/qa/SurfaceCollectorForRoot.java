@@ -24,7 +24,7 @@ public class SurfaceCollectorForRoot {
 	
 	
 	public static void main(String[] args) {
-
+		
 		String helpInfo = "FPS collect tool version 1.0 \n"
 				+ "-d	-fps default collector \n"
 				+ "-root	-another fps collector,pad need root \n"
@@ -134,7 +134,7 @@ public class SurfaceCollectorForRoot {
 							int current_FPSIndex = Integer.parseInt(
 									getFPSIndex(infoString), 16);
 							long timeIndex =current_Time - old_Time;
-							double fps_r = Math.round((current_FPSIndex - old_FPSIndex)
+							long fps_r = Math.round((current_FPSIndex - old_FPSIndex)
 									* 1000.0 / timeIndex);
 							old_FPSIndex = current_FPSIndex;
 							old_Time = current_Time;

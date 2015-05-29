@@ -19,25 +19,16 @@ public class SurfaceCollector {
 	
 	private static final String GET_FPS_COMMAND = "dumpsys SurfaceFlinger --latency";
 	private static final String CLEAR_FPS_COMMAND = "dumpsys SurfaceFlinger --latency-clear";
-	// com.android.settings/com.android.settings.Settings
-	private static final String WINDOW="com.nd.pad.smarthome/com.nd.launcher.core.launcher.Launcher";
+	
 	private static final String SURFACEFLINGER_SEPARATOR="\r\r\n";
 
-	private static  String Contacts_Window ="com.nd.pad.contacts/com.nd.pad.contacts.MainActivity";
-	private static  String Email_Window ="com.android.email/com.android.email.activity.Welcome";
-	
-	private static  String Camera_Window ="com.nd.pad.smartcamera/com.android.camera.CameraLauncher";
-	private static  String Gallery_Window ="com.android.gallery3d/com.android.gallery3d.app.GalleryActivity";
-	private static  String Browser_Window ="com.nd.pad.browser/.ui.activities.MainActivity";
-	private static String SurfaceView = "SurfaceView";
-	private static String Video_Window ="com.softwinner.fireplayer/com.softwinner.fireplayer.ui.VideoPlayerActivity";
-	
 	
 	public static void runFpsCollector(String window){
 		long lasttime =0;
 		if(clearSurfaceFlingerLatencyData()){
 			while(true){
 				long start =System.currentTimeMillis();
+				
 				String result = getCommandResult(window);
 				String[] resultArray = result.split(SURFACEFLINGER_SEPARATOR);
 				long refresh_period = 0;
@@ -69,6 +60,7 @@ public class SurfaceCollector {
 				
 				String windowInfo = AdbTools.getCommandResult("adb shell \"dumpsys activity |grep mResumedActivity\"",100);
 				String window = getWindowName(windowInfo);
+//				System.out.println(window);
 				if(!window.equals("")){
 					String result = getCommandResult(window);
 					String[] resultArray = result.split(SURFACEFLINGER_SEPARATOR);
@@ -98,7 +90,11 @@ public class SurfaceCollector {
 		
 		
 	}
-	
+	/**
+	 * 从信息中解析出完整的window 名称
+	 * @param info 使用adb shell \"dumpsys activity |grep mResumedActivity\"命令返回的信息
+	 * @return windowName
+	 */
 	public static String getWindowName(String info){
 		String window = "";
 		if(info!=null&&info.contains("mResumedActivity")){
@@ -119,6 +115,10 @@ public class SurfaceCollector {
 		return window;
 	}
 	
+	/**
+	 * 清除当前SurfaceFlinger Latency数据，并返回是支持该命令
+	 * @return 如果支持返回true，否则返回false
+	 */
 	public static boolean clearSurfaceFlingerLatencyData(){
 		boolean isSupport = false;
 		Process mProcess = null;
@@ -145,11 +145,17 @@ public class SurfaceCollector {
 		return AdbTools.getAdbShellCommandResult(GET_FPS_COMMAND+" " +window);
 	}
 	
-	
+	/**
+	 * SurfaceFlinger数据转换成Long数组
+	 * @param result
+	 * @param lasttime
+	 * @return
+	 */
 	public static ArrayList<Long> getSurfaceFlingerTime(String[] result,long lasttime){
 		ArrayList<Long> timestamp = new ArrayList<>();
+		//部分Pad可能存在返回结果大于128的错误数据
 		if(result.length>128){
-			return timestamp;
+			result = Arrays.copyOf(result, 128);
 		}
 		for(int i=1;i<result.length;i++){
 			String[] u = result[i].split("\t");
@@ -158,7 +164,7 @@ public class SurfaceCollector {
 				continue;
 			}
 			long time =Long.parseLong(u[1]);		
-			//time为Long.MAX_VALUE时说明数据异常
+			//time为Long.MAX_VALUE时说明数据异常，该数据可能因不同设备而不同，可以使用{GET_FPS_COMMAND}命令查看
 			if(time==0||time==Long.MAX_VALUE||time<=lasttime){
 				continue;
 			}
@@ -166,7 +172,13 @@ public class SurfaceCollector {
 		}
 		return timestamp;
 	}
-	
+	/**
+	 * 返回SurfaceFlinger相邻两行数据差的数组和相邻两行数据差与帧刷新时间的比值数组
+	 * @param data SurfaceFlinger数据
+	 * @param refresh_period 帧刷新时间
+	 * @param isLargeThanHalf 是否需要过滤无效帧即刷新间隔时间低于帧刷新时间一半
+	 * @return
+	 */
 	public static SurfaceFlingerData getSurfaceFlingerDataSubtraction(ArrayList<Long> data,long refresh_period,boolean isLargeThanHalf){
 		SurfaceFlingerData mSurfaceFlingerData = new SurfaceFlingerData();
 		ArrayList<Long> timestamp = new ArrayList<Long>();
@@ -190,6 +202,12 @@ public class SurfaceCollector {
 		return mSurfaceFlingerData;
 	}
 	
+	/**
+	 * 返回SurfaceFlinger相邻两行数据差的数组和相邻两行数据差与帧刷新时间的比值数组
+	 * @param data SurfaceFlinger数据
+	 * @param refresh_period 帧刷新时间
+	 * @return
+	 */
 	public static SurfaceFlingerData getSurfaceFlingerDataSubtraction(ArrayList<Long> data,long refresh_period){
 		SurfaceFlingerData mSurfaceFlingerData = new SurfaceFlingerData();
 		ArrayList<Long> timestamp = new ArrayList<Long>();
@@ -205,13 +223,17 @@ public class SurfaceCollector {
 		return mSurfaceFlingerData;
 	}
 	
+	/**
+	 * 计算帧率和卡帧数
+	 * @param refresh_period 帧刷新时间
+	 * @param timestamps SurfaceFlinger数据（三列的中间列）
+	 * @return 返回本次计算最后一帧的时间，用于下一次计算。
+	 */
 	public static long calculateResults(long refresh_period,ArrayList<Long> timestamps){
 		
 		int frameCount = timestamps.size();
-//		System.out.println("framecount:"+frameCount);
 		long lasttime =timestamps.get(frameCount-1);
 		long second = lasttime-timestamps.get(0);
-//		System.out.println("second:"+second/1e9);
 		
 		SurfaceFlingerData mSurfaceFlingerData = getSurfaceFlingerDataSubtraction(timestamps,refresh_period);
 		ArrayList<Long> frameLengths = mSurfaceFlingerData.getTimestamps();
